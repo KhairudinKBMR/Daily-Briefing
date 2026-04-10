@@ -296,9 +296,11 @@ function rainChance(desc) {
   if (d.includes('heavy rain') || d.includes('heavy showers')) return 85;
   if (d.includes('moderate rain') || d.includes('moderate showers')) return 70;
   if (d.includes('rain') || d.includes('showers') || d.includes('drizzle')) return 55;
-  if (d.includes('partly cloudy')) return 20;
-  if (d.includes('cloudy') || d.includes('overcast')) return 30;
-  if (d.includes('fair')) return 5;
+  if (d.includes('partly cloudy') || d.includes('fair & cloudy')) return 20;
+  if (d.includes('overcast')) return 35;
+  if (d.includes('cloudy')) return 30;
+  if (d.includes('fair') || d.includes('sunny') || d.includes('clear')) return 5;
+  if (d.includes('hazy') || d.includes('haze')) return 10;
   return 15;
 }
 
@@ -347,7 +349,8 @@ async function fetchWeather() {
 
     const forecastHTML = periods.slice(0, 4).map((p, i) => {
       const desc = safeStr(p.regions?.central || p.forecast?.text || p.forecast) || 'N/A';
-      const rain = rainChance(desc);
+      const neaRain = p.relativeHumidity?.low ?? p.rainfall?.low ?? null;
+      const rain = neaRain !== null ? Math.min(neaRain, 100) : rainChance(desc);
       const ico  = weatherIcon(desc);
       const tLow  = p.temperature?.low  ?? '';
       const tHigh = p.temperature?.high ?? '';
