@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Briefing</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0; --surface: #ffffff; --surface2: #f1efe8;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --text: #1a1a1a; --text2: #555550; --text3: #888780;
+    --accent-global: #185FA5; --accent-global-bg: #E6F1FB; --accent-global-text: #0C447C;
+    --accent-tech: #3C3489; --accent-tech-bg: #EEEDFE; --accent-tech-text: #26215C;
+    --accent-local: #0F6E56; --accent-local-bg: #E1F5EE; --accent-local-text: #085041;
+    --radius: 12px; --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --surface: #242422; --surface2: #2c2c2a;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+      --text: #f0efe8; --text2: #b4b2a9; --text3: #888780;
+      --accent-global: #378ADD; --accent-global-bg: #0C447C; --accent-global-text: #B5D4F4;
+      --accent-tech: #7F77DD; --accent-tech-bg: #3C3489; --accent-tech-text: #CECBF6;
+      --accent-local: #1D9E75; --accent-local-bg: #085041; --accent-local-text: #9FE1CB;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1.5rem 3rem; }
+
+  .header { max-width: 1400px; margin: 0 auto 1.5rem; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .header-left h1 { font-size: 22px; font-weight: 500; color: var(--text); letter-spacing: -0.3px; }
+  .header-left .dateline { font-size: 13px; color: var(--text3); margin-top: 2px; }
+  .refresh-btn { background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; color: var(--text2); cursor: pointer; font-family: inherit; }
+  .refresh-btn:hover { background: var(--surface2); }
+  .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .weather-block { max-width: 1400px; margin: 0 auto 1.75rem; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; }
+  .weather-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1rem; }
+  .weather-main { display: flex; align-items: center; gap: 16px; }
+  .weather-icon { font-size: 36px; line-height: 1; }
+  .weather-temp { font-size: 36px; font-weight: 500; color: var(--text); letter-spacing: -1px; }
+  .weather-desc { font-size: 14px; color: var(--text2); margin-top: 2px; }
+  .weather-location { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .weather-metrics { display: flex; gap: 8px; flex-wrap: wrap; }
+  .metric-pill { background: var(--surface2); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; color: var(--text2); display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 72px; text-align: center; }
+  .metric-pill .metric-val { font-size: 15px; font-weight: 500; color: var(--text); }
+  .metric-pill .metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; }
+  .weather-divider { border: none; border-top: 0.5px solid var(--border); margin: 0.9rem 0; }
+  .forecast-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .forecast-period { flex: 1; min-width: 100px; background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 10px; text-align: center; }
+  .forecast-time { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .forecast-icon { font-size: 18px; margin-bottom: 4px; }
+  .forecast-desc { font-size: 11px; color: var(--text2); line-height: 1.3; margin-bottom: 4px; }
+  .forecast-temp { font-size: 11px; color: var(--text3); }
+  .rain-bar-wrap { margin-top: 3px; }
+  .rain-bar-bg { background: var(--border2); border-radius: 999px; height: 4px; width: 100%; overflow: hidden; }
+  .rain-bar-fill { height: 100%; border-radius: 999px; background: #378ADD; transition: width 0.4s; }
+  .rain-pct { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .weather-loading { color: var(--text3); font-size: 13px; padding: 1rem 0; }
+  .weather-error { color: var(--text3); font-size: 12px; }
+
+  .tabs { max-width: 1400px; margin: 0 auto 1.5rem; display: flex; gap: 6px; }
+  .tab { padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--border2); background: var(--surface); color: var(--text2); }
+  .tab.active-global { background: var(--accent-global-bg); color: var(--accent-global-text); border-color: transparent; }
+  .tab.active-tech { background: var(--accent-tech-bg); color: var(--accent-tech-text); border-color: transparent; }
+  .tab.active-local { background: var(--accent-local-bg); color: var(--accent-local-text); border-color: transparent; }
+  .panel { display: none; max-width: 1400px; margin: 0 auto; }
+  .panel.visible { display: block; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 10px; min-height: 180px; }
+  .card-badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; width: fit-content; }
+  .badge-global { background: var(--accent-global-bg); color: var(--accent-global-text); }
+  .badge-tech { background: var(--accent-tech-bg); color: var(--accent-tech-text); }
+  .badge-local { background: var(--accent-local-bg); color: var(--accent-local-text); }
+  .card-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; }
+  .card-summary { font-size: 13px; color: var(--text2); line-height: 1.6; flex: 1; }
+  .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 0.5px solid var(--border); }
+  .card-source { font-size: 11px; color: var(--text3); }
+  .card-link { font-size: 12px; color: var(--accent-global); text-decoration: none; }
+  .card-link:hover { text-decoration: underline; }
+  .skeleton { background: var(--surface2); border-radius: 4px; animation: pulse 1.4s ease-in-out infinite; }
+  .sk-title { height: 16px; width: 85%; margin-bottom: 6px; }
+  .sk-title2 { height: 16px; width: 60%; }
+  .sk-line { height: 12px; width: 100%; margin-bottom: 5px; }
+  .sk-line-short { height: 12px; width: 70%; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .status-bar { max-width: 1400px; margin: 1.25rem auto 0; font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--text3); }
+  .status-dot.ok { background: #3B6D11; }
+  .status-dot.err { background: #A32D2D; }
+  .status-dot.loading { background: #BA7517; animation: pulse 1s infinite; }
+  body {
+    background-color: #0a0e14;
+    background-image: linear-gradient(to bottom, rgba(10,14,20,0.70) 0%, rgba(10,14,20,0.50) 35%, rgba(10,14,20,0.80) 100%), url('singaporeskyline.jpg');
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+    padding: 2rem 4rem 3rem;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(5,8,14,0.72) 100%);
+    z-index: 0;
+  }
+  .header, .weather-block, .prayer-block, .tabs, .panel, .status-bar {
+    position: relative;
+    z-index: 1;
+  }
+  .header-left h1 { color: #ffffff; }
+  .header-left .dateline { color: rgba(255,255,255,0.55); }
+  .weather-block, .card { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .card-title { color: #f0efe8; }
+  .card-summary { color: rgba(255,255,255,0.65); }
+  .card-source { color: rgba(255,255,255,0.4); }
+  .metric-pill { background: rgba(255,255,255,0.08); }
+  .metric-pill .metric-val { color: #ffffff; }
+  .metric-pill .metric-label { color: rgba(255,255,255,0.45); }
+  .forecast-period { background: rgba(255,255,255,0.07); }
+  .forecast-time { color: rgba(255,255,255,0.4); }
+  .forecast-desc { color: rgba(255,255,255,0.65); }
+  .forecast-temp { color: rgba(255,255,255,0.45); }
+  .rain-pct { color: rgba(255,255,255,0.4); }
+  .weather-desc { color: rgba(255,255,255,0.75); }
+  .weather-location { color: rgba(255,255,255,0.4); }
+  .weather-temp { color: #ffffff; }
+  .weather-divider { border-color: rgba(255,255,255,0.1); }
+  .tab { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); }
+  .tab:hover { background: rgba(255,255,255,0.14); }
+  .refresh-btn { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+  .refresh-btn:hover { background: rgba(255,255,255,0.14); }
+  .card-footer { border-color: rgba(255,255,255,0.1); }
+  .status-bar { color: rgba(255,255,255,0.4); }
+  .skeleton { background: rgba(255,255,255,0.1); }
+  .prayer-block { max-width: 1400px; margin: 0 auto 1.75rem; background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.12); border-radius: var(--radius); padding: 0.9rem 1.25rem; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .prayer-header { font-size: 10px; font-weight: 500; letter-spacing: 0.6px; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 0.75rem; }
+  .prayer-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .prayer-pill { flex: 1; min-width: 80px; background: rgba(255,255,255,0.06); border: 0.5px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm); padding: 7px 10px; text-align: center; transition: background 0.2s; }
+  .prayer-pill.active { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+  .prayer-pill.passed { opacity: 0.45; }
+  .prayer-name { font-size: 10px; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+  .prayer-time { font-size: 14px; font-weight: 500; color: #ffffff; }
+  .prayer-pill.active .prayer-name { color: rgba(255,255,255,0.8); }
+  .prayer-loading { font-size: 13px; color: rgba(255,255,255,0.4); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .clock { font-size: 22px; font-weight: 500; color: #ffffff; letter-spacing: -0.3px; line-height: 1; }
+  .clock-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .header-title { font-size: 22px; font-weight: 500; color: #ffffff; letter-spacing: -0.3px; }
+  .header-date { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .header-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.15); margin: 0 4px; }
+  .shortcuts { max-width: 1400px; margin: 0 auto 1.5rem; display: flex; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
+  .shortcut { display: flex; align-items: center; gap: 9px; padding: 8px 16px; background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.12); border-radius: 999px; text-decoration: none; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: background 0.18s, border-color 0.18s; cursor: pointer; }
+  .shortcut:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.25); }
+  .shortcut:active { transform: scale(0.97); }
+  .shortcut-icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .shortcut-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.8); letter-spacing: 0.1px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="clock-label">Singapore Time</div>
+    </div>
+    <div class="header-divider"></div>
+    <div>
+      <div class="header-title">Daily Briefing</div>
+      <div class="header-date" id="dateline"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">Refresh</button>
+  </div>
+</div>
+
+<div class="shortcuts">
+
+  <a class="shortcut" href="https://youtube.com" target="_blank">
+    <span class="shortcut-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="24" rx="5" fill="#FF0000"/>
+        <path d="M19.6 8.2s-.2-1.3-.8-1.9c-.7-.8-1.6-.8-2-.8C14.5 5.4 12 5.4 12 5.4s-2.5 0-4.8.1c-.4 0-1.3.1-2 .8-.6.6-.8 1.9-.8 1.9S4.2 9.6 4.2 11v1.3c0 1.4.2 2.8.2 2.8s.2 1.3.8 1.9c.7.8 1.7.7 2.2.8C8.8 18 12 18 12 18s2.5 0 4.8-.2c.4 0 1.3-.1 2-.8.6-.6.8-1.9.8-1.9s.2-1.4.2-2.8V11c0-1.4-.2-2.8-.2-2.8zM10.2 14.4V9.6l5.4 2.4-5.4 2.4z" fill="white"/>
+      </svg>
+    </span>
+    <span class="shortcut-label">YouTube</span>
+  </a>
+
+  <a class="shortcut" href="https://reddit.com" target="_blank">
+    <span class="shortcut-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="12" fill="#FF4500"/>
+        <path d="M20 12c0-1.1-.9-2-2-2-.5 0-1 .2-1.4.5-1.3-.9-3.1-1.5-5.1-1.6l.9-4 2.8.6c0 .7.6 1.3 1.3 1.3s1.3-.6 1.3-1.3-.6-1.3-1.3-1.3c-.5 0-.9.3-1.1.7l-3.2-.7c-.2 0-.3.1-.3.2l-1 4.5c-2 .1-3.8.7-5.1 1.6-.4-.3-.9-.5-1.4-.5-1.1 0-2 .9-2 2 0 .8.5 1.5 1.2 1.8 0 .2-.1.4-.1.6 0 2.9 3.4 5.3 7.5 5.3s7.5-2.4 7.5-5.3c0-.2 0-.4-.1-.6.7-.3 1.2-1 1.2-1.8zm-13 1c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3-.6 1.3-1.3 1.3S7 13.7 7 13zm7.4 3.4c-.9.9-2.6.9-3 .9s-2.1 0-3-.9c-.1-.1-.1-.3 0-.5.1-.1.3-.1.5 0 .7.7 2 .9 2.5.9s1.8-.2 2.5-.9c.1-.1.4-.1.5 0s.1.4 0 .5zm-.2-2.1c-.7 0-1.3-.6-1.3-1.3s.6-1.3 1.3-1.3 1.3.6 1.3 1.3-.6 1.3-1.3 1.3z" fill="white"/>
+      </svg>
+    </span>
+    <span class="shortcut-label">Reddit</span>
+  </a>
+
+  <a class="shortcut" href="https://x.com" target="_blank">
+    <span class="shortcut-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="24" rx="5" fill="#000000"/>
+        <path d="M17.8 4h2.6l-5.7 6.5L21.4 20h-5.2l-4.1-5.4L7.4 20H4.8l6.1-7L4 4h5.3l3.7 4.9L17.8 4zm-.9 14.4h1.4L7.3 5.4H5.8l11.1 13z" fill="white"/>
+      </svg>
+    </span>
+    <span class="shortcut-label">X</span>
+  </a>
+
+  <a class="shortcut" href="https://carousell.sg" target="_blank">
+    <span class="shortcut-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="24" rx="5" fill="#D0021B"/>
+        <text x="12" y="17" font-size="13" font-weight="700" text-anchor="middle" fill="white" font-family="Arial, sans-serif">C</text>
+      </svg>
+    </span>
+    <span class="shortcut-label">Carousell</span>
+  </a>
+
+  <a class="shortcut" href="https://netflix.com" target="_blank">
+    <span class="shortcut-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="24" rx="5" fill="#141414"/>
+        <path d="M6 4h3.3l3 8.6V4H15.4v16h-3.2l-3.1-8.7V20H6V4z" fill="#E50914"/>
+      </svg>
+    </span>
+    <span class="shortcut-label">Netflix</span>
+  </a>
+
+</div>
+
+<div class="weather-block" id="weatherBlock">
+  <div class="weather-loading">Loading weather...</div>
+</div>
+
+<div class="prayer-block" id="prayerBlock">
+  <div class="prayer-loading">Loading prayer times...</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active-global" id="tab-global" onclick="switchTab('global')">Global</div>
+  <div class="tab" id="tab-tech" onclick="switchTab('tech')">Tech</div>
+  <div class="tab" id="tab-local" onclick="switchTab('local')">Singapore &amp; SEA</div>
+</div>
+
+<div class="panel visible" id="panel-global"><div class="cards-grid" id="cards-global"></div></div>
+<div class="panel" id="panel-tech"><div class="cards-grid" id="cards-tech"></div></div>
+<div class="panel" id="panel-local"><div class="cards-grid" id="cards-local"></div></div>
+
+<div class="status-bar">
+  <div class="status-dot loading" id="statusDot"></div>
+  <span id="statusText">Fetching today's news...</span>
+</div>
+
+<script>
+const SEARXNG = window.location.origin + '/searxng';
+const OLLAMA  = window.location.origin + '/ollama';
+const MODEL   = 'qwen3:32b';
+const NEA     = 'https://api-open.data.gov.sg/v2/real-time/api';
+
+const BLOCKED_DOMAINS = [
+  'facebook.com','fb.com','reddit.com','twitter.com','x.com',
+  'instagram.com','tiktok.com','youtube.com','linkedin.com',
+  'pinterest.com','tumblr.com','snapchat.com'
+];
+
+function safeStr(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') return val.text || val.description || val.forecast || val.value || JSON.stringify(val);
+  return String(val);
+}
+
+function weatherIcon(desc) {
+  const s = safeStr(desc);
+  if (!s) return '🌤';
+  const d = s.toLowerCase();
+  if (d.includes('thunder')) return '⛈';
+  if (d.includes('heavy rain') || d.includes('heavy showers')) return '🌧';
+  if (d.includes('rain') || d.includes('shower') || d.includes('drizzle')) return '🌦';
+  if (d.includes('cloudy') || d.includes('overcast')) return '☁';
+  if (d.includes('partly cloudy') || d.includes('fair & cloudy')) return '⛅';
+  if (d.includes('hazy') || d.includes('haze')) return '🌫';
+  if (d.includes('windy')) return '💨';
+  if (d.includes('fair') || d.includes('sunny') || d.includes('clear')) return '☀';
+  return '🌤';
+}
+
+function rainChance(desc) {
+  const s = safeStr(desc);
+  if (!s) return 0;
+  const d = s.toLowerCase();
+  if (d.includes('thunder')) return 90;
+  if (d.includes('heavy rain') || d.includes('heavy showers')) return 85;
+  if (d.includes('moderate rain') || d.includes('moderate showers')) return 70;
+  if (d.includes('rain') || d.includes('showers') || d.includes('drizzle')) return 55;
+  if (d.includes('partly cloudy')) return 20;
+  if (d.includes('cloudy') || d.includes('overcast')) return 30;
+  if (d.includes('fair')) return 5;
+  return 15;
+}
+
+async function fetchWeather() {
+  const block = document.getElementById('weatherBlock');
+  try {
+    const [tempRes, humRes, forecastRes, nowcastRes] = await Promise.all([
+      fetch(`${NEA}/air-temperature`),
+      fetch(`${NEA}/relative-humidity`),
+      fetch(`${NEA}/twenty-four-hr-forecast`),
+      fetch(`${NEA}/two-hr-forecast`)
+    ]);
+
+    const [tempData, humData, forecastData, nowcastData] = await Promise.all([
+      tempRes.json(), humRes.json(), forecastRes.json(), nowcastRes.json()
+    ]);
+
+    const tempReadings = tempData?.data?.readings?.[0]?.data || [];
+    const humReadings  = humData?.data?.readings?.[0]?.data  || [];
+
+    const avgTemp = tempReadings.length
+      ? (tempReadings.reduce((s, r) => s + r.value, 0) / tempReadings.length).toFixed(1)
+      : '--';
+    const avgHum = humReadings.length
+      ? Math.round(humReadings.reduce((s, r) => s + r.value, 0) / humReadings.length)
+      : '--';
+
+    const forecast24 = forecastData?.data?.records?.[0];
+    const generalForecast = safeStr(forecast24?.general?.forecast?.text || forecast24?.general?.forecast) || 'N/A';
+    const tempRange = forecast24?.general?.temperature || {};
+    const humRange  = forecast24?.general?.relativeHumidity || {};
+    const windSpeed = forecast24?.general?.wind?.speed || {};
+    const windDir   = safeStr(forecast24?.general?.wind?.direction) || '';
+    const periods   = forecast24?.periods || [];
+
+    const nowcastAreas = nowcastData?.data?.items?.[0]?.forecasts || [];
+    const centralArea  = nowcastAreas.find(a =>
+      ['central','city','orchard','newton','bedok'].some(k => a.area?.toLowerCase().includes(k))
+    ) || nowcastAreas[0];
+    const nowcastDesc = safeStr(centralArea?.forecast) || generalForecast;
+
+    const rainPct = rainChance(nowcastDesc);
+    const icon    = weatherIcon(nowcastDesc);
+
+    const periodLabels = ['Morning', 'Afternoon', 'Evening', 'Night'];
+
+    const forecastHTML = periods.slice(0, 4).map((p, i) => {
+      const desc = safeStr(p.regions?.central || p.forecast?.text || p.forecast) || 'N/A';
+      const rain = rainChance(desc);
+      const ico  = weatherIcon(desc);
+      const tLow  = p.temperature?.low  ?? '';
+      const tHigh = p.temperature?.high ?? '';
+      const tempStr = tLow !== '' && tHigh !== '' ? `${tLow}–${tHigh}°C` : '';
+      return `
+        <div class="forecast-period">
+          <div class="forecast-time">${periodLabels[i] || 'Later'}</div>
+          <div class="forecast-icon">${ico}</div>
+          <div class="forecast-desc">${esc(desc)}</div>
+          ${tempStr ? `<div class="forecast-temp">${tempStr}</div>` : ''}
+          <div class="rain-bar-wrap">
+            <div class="rain-bar-bg"><div class="rain-bar-fill" style="width:${rain}%"></div></div>
+            <div class="rain-pct">${rain}% rain</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const tempLow  = tempRange.low  ?? '--';
+    const tempHigh = tempRange.high ?? '--';
+    const humLow   = humRange.low   ?? '--';
+    const humHigh  = humRange.high  ?? '--';
+    const windLow  = windSpeed.low  ?? '--';
+    const windHigh = windSpeed.high ?? '--';
+
+    block.innerHTML = `
+      <div class="weather-top">
+        <div class="weather-main">
+          <div class="weather-icon">${icon}</div>
+          <div>
+            <div class="weather-temp">${avgTemp}°C</div>
+            <div class="weather-desc">${esc(nowcastDesc)}</div>
+            <div class="weather-location">Singapore · Live from NEA</div>
+          </div>
+        </div>
+        <div class="weather-metrics">
+          <div class="metric-pill">
+            <span class="metric-val">${avgHum}%</span>
+            <span class="metric-label">Humidity</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-val">${rainPct}%</span>
+            <span class="metric-label">Rain chance</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-val">${tempLow}–${tempHigh}°</span>
+            <span class="metric-label">Today range</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-val">${humLow}–${humHigh}%</span>
+            <span class="metric-label">Humidity range</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-val">${windLow}–${windHigh}</span>
+            <span class="metric-label">Wind km/h ${esc(windDir)}</span>
+          </div>
+        </div>
+      </div>
+      ${forecastHTML ? `<hr class="weather-divider"><div class="forecast-row">${forecastHTML}</div>` : ''}
+    `;
+  } catch(e) {
+    block.innerHTML = `<div class="weather-error">Weather unavailable — ${esc(e.message)}</div>`;
+  }
+}
+
+const CATEGORIES = {
+  global: {
+    label: 'Global', badge: 'badge-global',
+    queries: ['top world news today', 'major international news today', 'world economy politics today', 'breaking news today', 'global events today'],
+    system: 'You are a strict news summarizer. You output ONLY raw JSON arrays. You NEVER invent, embellish, or add details not present in the provided snippets. You NEVER use your training knowledge to fill gaps. If a snippet is thin, report only what is explicitly stated. No thinking, no explanation, no markdown, no code fences. Just the JSON array.',
+    region: null
+  },
+  tech: {
+    label: 'Tech', badge: 'badge-tech',
+    queries: ['artificial intelligence news today', 'technology industry news today', 'major tech company news today', 'science technology breakthroughs today', 'startup funding tech news today'],
+    system: 'You are a strict tech news summarizer. You output ONLY raw JSON arrays. You NEVER invent, embellish, or add details not present in the provided snippets. You NEVER use your training knowledge to fill gaps. If a snippet is thin, report only what is explicitly stated. No thinking, no explanation, no markdown, no code fences. Just the JSON array.',
+    region: null
+  },
+  local: {
+    label: 'SEA', badge: 'badge-local',
+    queries: ['Singapore news today', 'Southeast Asia news today', 'ASEAN regional news today', 'Malaysia Indonesia Thailand news today', 'Singapore economy politics today'],
+    system: 'You are a strict Southeast Asia news summarizer. You output ONLY raw JSON arrays. You NEVER invent, embellish, or add details not present in the provided snippets. You NEVER use your training knowledge to fill gaps. If a snippet is thin, report only what is explicitly stated. No thinking, no explanation, no markdown, no code fences. Just the JSON array.',
+    region: 'Singapore or Southeast Asia'
+  }
+};
+
+function buildUserPrompt(context, region) {
+  return `Here are search results from today's news${region ? ' in ' + region : ''}:
+
+${context}
+
+STRICT RULES:
+1. Pick exactly 3 stories about DIFFERENT topics — no duplicates, no stories covering the same event.
+2. The title and summary MUST come ONLY from the snippet text provided. Do NOT use your training knowledge.
+3. The URL in your response MUST exactly match the URL shown in the search result for that story.
+4. If a snippet is too thin to write a proper summary, skip that result and pick another.
+5. Do NOT invent quotes, statistics, or details not present in the snippets.
+
+Return ONLY a JSON array with exactly 3 objects, no other text:
+[
+  {"title":"headline exactly as in snippet","summary":"Two sentences using only information from the snippet.","source":"publication name from URL","url":"https://exact-url-from-results.com"},
+  {"title":"headline exactly as in snippet","summary":"Two sentences using only information from the snippet.","source":"publication name from URL","url":"https://exact-url-from-results.com"},
+  {"title":"headline exactly as in snippet","summary":"Two sentences using only information from the snippet.","source":"publication name from URL","url":"https://exact-url-from-results.com"}
+]`;
+}
+
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-SG', {
+      timeZone: 'Asia/Singapore',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    });
+    document.getElementById('clock').textContent = timeStr;
+    document.getElementById('dateline').textContent = now.toLocaleDateString('en-SG', {
+      timeZone: 'Asia/Singapore',
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+function switchTab(tab) {
+  ['global','tech','local'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('visible', t === tab);
+    const el = document.getElementById('tab-' + t);
+    el.className = 'tab';
+    if (t === tab) el.classList.add('active-' + t);
+  });
+}
+
+function showSkeletons(id) {
+  document.getElementById(id).innerHTML = [1,2,3].map(() => `
+    <div class="card">
+      <div class="skeleton sk-title"></div><div class="skeleton sk-title2"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:5px;margin-top:4px;">
+        <div class="skeleton sk-line"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line-short"></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCard(id, item, badge) {
+  const url = (item.url || '').startsWith('http') ? item.url : '#';
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <span class="card-badge ${badge}">${CATEGORIES[id.replace('cards-','')].label}</span>
+    <div class="card-title">${esc(item.title)}</div>
+    <div class="card-summary">${esc(item.summary)}</div>
+    <div class="card-footer">
+      <span class="card-source">${esc(item.source || '')}</span>
+      ${url !== '#' ? `<a class="card-link" href="${url}" target="_blank">Read more</a>` : ''}
+    </div>`;
+  document.getElementById(id).appendChild(card);
+}
+
+function renderErrorCard(id, msg) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-title" style="color:var(--text3)">Could not load stories</div>
+    <div class="card-summary" style="color:var(--text3);font-size:12px;">${esc(msg)}</div>`;
+  document.getElementById(id).appendChild(card);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function extractJsonArray(text) {
+  const cleaned = (text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```json/gi, '').replace(/```/g, '')
+    .trim();
+  const match = cleaned.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('Model did not return a JSON array');
+  const arr = JSON.parse(match[0]);
+  if (!Array.isArray(arr) || arr.length === 0) throw new Error('Empty array returned');
+  return arr;
+}
+
+function isBlockedDomain(url) {
+  return BLOCKED_DOMAINS.some(d => url.includes(d));
+}
+
+async function searchAll(queries) {
+  const results = [];
+  for (const q of queries) {
+    try {
+      const res = await fetch(`${SEARXNG}/search?q=${encodeURIComponent(q)}&format=json&language=en&time_range=day`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const hits = (data.results || [])
+        .filter(r => r.url && !isBlockedDomain(r.url))
+        .filter(r => r.content && r.content.length > 80)
+        .slice(0, 3)
+        .map(r => {
+          const domain = new URL(r.url).hostname.replace('www.','');
+          return `Title: ${r.title}\nSource: ${domain}\nURL: ${r.url}\nSnippet: ${(r.content||'').slice(0,350)}`;
+        });
+      results.push(...hits);
+    } catch(e) { /* skip */ }
+  }
+  const seen = new Set();
+  return results.filter(r => {
+    const key = r.slice(0, 80);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 15).join('\n\n---\n\n');
+}
+
+async function summariseAll(context, system, region) {
+  const res = await fetch(`${OLLAMA}/api/chat`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      model: MODEL,
+      stream: false,
+      think: false,
+      options: { temperature: 0.1, num_predict: 800, num_ctx: 8192 },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: buildUserPrompt(context, region) }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`Ollama error ${res.status}`);
+  const data = await res.json();
+  return extractJsonArray(data.message?.content || '');
+}
+
+async function fetchCategory(key) {
+  const cat = CATEGORIES[key];
+  const id = 'cards-' + key;
+  showSkeletons(id);
+  try {
+    const context = await searchAll(cat.queries);
+    if (!context.trim()) throw new Error('No results found for today — try refreshing');
+    const items = await summariseAll(context, cat.system, cat.region);
+    document.getElementById(id).innerHTML = '';
+    items.slice(0, 3).forEach(item => renderCard(id, item, cat.badge));
+  } catch(e) {
+    document.getElementById(id).innerHTML = '';
+    renderErrorCard(id, e.message);
+  }
+}
+
+async function fetchAll() {
+  const btn = document.getElementById('refreshBtn');
+  const dot = document.getElementById('statusDot');
+  const st  = document.getElementById('statusText');
+  btn.disabled = true;
+  dot.className = 'status-dot loading';
+  try {
+    st.textContent = 'Loading global news...';
+    await fetchCategory('global');
+    st.textContent = 'Loading tech news...';
+    await fetchCategory('tech');
+    st.textContent = 'Loading Singapore & SEA news...';
+    await fetchCategory('local');
+    dot.className = 'status-dot ok';
+    st.textContent = `Updated ${new Date().toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'})} · Fully local · Ollama + SearXNG`;
+  } catch(e) {
+    dot.className = 'status-dot err';
+    st.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function refreshAll() {
+  fetchWeather();
+  fetchPrayerTimes();
+  fetchAll();
+}
+
+let _prayerRecord = null;
+let _prayerPrayers = null;
+let _prayerDateDisp = null;
+
+function updatePrayerHighlight() {
+  if (!_prayerRecord || !_prayerPrayers) return;
+
+  function toMins(t) {
+    if (!t) return 9999;
+    const parts = t.replace(/[^\d:]/g, '').split(':');
+    return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+  }
+
+  const nowSGT = new Date().toLocaleTimeString('en-SG', {
+    timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', hour12: false
+  });
+  const [nowH, nowM] = nowSGT.split(':').map(Number);
+  const nowMins = nowH * 60 + nowM;
+  const prayerMins = _prayerPrayers.map(p => toMins(_prayerRecord[p.key]));
+
+  let activeIdx = -1;
+  for (let i = prayerMins.length - 1; i >= 0; i--) {
+    if (nowMins >= prayerMins[i]) { activeIdx = i; break; }
+  }
+
+  const pills = document.querySelectorAll('.prayer-pill');
+  pills.forEach((pill, i) => {
+    pill.classList.remove('active', 'passed');
+    if (i === activeIdx) pill.classList.add('active');
+    else if (i < activeIdx) pill.classList.add('passed');
+  });
+}
+
+async function fetchPrayerTimes() {
+  const block = document.getElementById('prayerBlock');
+  try {
+    const now  = new Date();
+    const yyyy = now.toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore', year: 'numeric' });
+    const mm   = now.toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore', month: '2-digit' });
+    const dd   = now.toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore', day: '2-digit' });
+    const dateStr = `${dd}-${mm}-${yyyy}`;
+
+    const params = new URLSearchParams({
+      date:    dateStr,
+      city:    'Singapore',
+      country: 'Singapore',
+      method:  '11'
+    });
+    const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.code !== 200) throw new Error(data.status || 'API error');
+    const t = data.data.timings;
+
+    _prayerRecord = {
+      subuh:   t.Fajr,
+      syuruk:  t.Sunrise,
+      zohor:   t.Dhuhr,
+      asar:    t.Asr,
+      maghrib: t.Maghrib,
+      isyak:   t.Isha
+    };
+    _prayerDateDisp = `${yyyy}-${mm}-${dd}`;
+    _prayerPrayers = [
+      { name: 'Subuh',   key: 'subuh'   },
+      { name: 'Syuruk',  key: 'syuruk'  },
+      { name: 'Zohor',   key: 'zohor'   },
+      { name: 'Asar',    key: 'asar'    },
+      { name: 'Maghrib', key: 'maghrib' },
+      { name: 'Isyak',   key: 'isyak'   }
+    ];
+
+    function toMins(t) {
+      if (!t) return 9999;
+      const parts = t.replace(/[^\d:]/g, '').split(':');
+      return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+    }
+
+    function fmt(t) {
+      if (!t) return '--:--';
+      return t.replace(/(\d+):(\d+).*/, (_, h, m) => {
+        const hh = parseInt(h);
+        const ampm = hh >= 12 ? 'pm' : 'am';
+        const h12 = hh % 12 || 12;
+        return `${h12}:${m}${ampm}`;
+      });
+    }
+
+    const nowSGT = new Date().toLocaleTimeString('en-SG', {
+      timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    const [nowH, nowM] = nowSGT.split(':').map(Number);
+    const nowMins = nowH * 60 + nowM;
+    const prayerMins = _prayerPrayers.map(p => toMins(_prayerRecord[p.key]));
+
+    let activeIdx = -1;
+    for (let i = prayerMins.length - 1; i >= 0; i--) {
+      if (nowMins >= prayerMins[i]) { activeIdx = i; break; }
+    }
+
+    const pillsHTML = _prayerPrayers.map((p, i) => {
+      const isPassed = i < activeIdx;
+      const isActive = i === activeIdx;
+      const cls = isActive ? 'active' : isPassed ? 'passed' : '';
+      return `
+        <div class="prayer-pill ${cls}">
+          <div class="prayer-name">${p.name}</div>
+          <div class="prayer-time">${fmt(_prayerRecord[p.key])}</div>
+        </div>`;
+    }).join('');
+
+    block.innerHTML = `
+      <div class="prayer-header">Waktu Solat · Singapore · ${_prayerDateDisp}</div>
+      <div class="prayer-row">${pillsHTML}</div>`;
+
+  } catch(e) {
+    block.innerHTML = `<div class="prayer-loading">Prayer times unavailable — ${esc(e.message)}</div>`;
+  }
+}
+
+startClock();
+fetchWeather();
+fetchPrayerTimes();
+fetchAll();
+setInterval(updatePrayerHighlight, 60000);
+</script>
+</body>
+</html>
